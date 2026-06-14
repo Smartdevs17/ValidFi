@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CacheModule } from '@nestjs/cache-manager';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { redisStore } from 'cache-manager-redis-store';
 import { IdentityModule } from './identity/identity.module';
 import { VerificationModule } from './verification/verification.module';
@@ -12,6 +15,7 @@ import { IpfsModule } from './ipfs/ipfs.module';
 import { AiModule } from './ai/ai.module';
 import { SorobanModule } from './soroban/soroban.module';
 import { IndexerModule } from './indexer/indexer.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -31,6 +35,16 @@ import { IndexerModule } from './indexer/indexer.module';
         synchronize: configService.get('NODE_ENV') === 'development',
         logging: configService.get('NODE_ENV') === 'development',
       }),
+      inject: [ConfigService],
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => [
+        {
+          ttl: configService.get<number>('THROTTLE_TTL') ?? 60000,
+          limit: configService.get<number>('THROTTLE_LIMIT') ?? 60,
+        },
+      ],
       inject: [ConfigService],
     }),
     CacheModule.registerAsync({
@@ -53,6 +67,13 @@ import { IndexerModule } from './indexer/indexer.module';
     AiModule,
     SorobanModule,
     IndexerModule,
+    HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

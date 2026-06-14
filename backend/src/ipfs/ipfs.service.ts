@@ -1,68 +1,70 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { create } from 'ipfs-http-client';
+import PinataClient from '@pinata/sdk';
 import { Readable } from 'stream';
 
 @Injectable()
 export class IpfsService {
-  private ipfs: any;
+  private pinata: PinataClient;
 
   constructor(private readonly configService: ConfigService) {
-    const pinataKey = this.configService.get<string>('PINATA_API_KEY');
-    const pinataSecret = this.configService.get<string>('PINATA_API_SECRET');
-    
-    if (pinataKey && pinataSecret) {
-      this.ipfs = create({
-        host: 'api.pinata.cloud',
-        port: 443,
-        protocol: 'https',
-        headers: {
-          authorization: `Bearer ${pinataKey}:${pinataSecret}`,
-        },
-      });
+    const apiKey = this.configService.get<string>('PINATA_API_KEY');
+    const apiSecret = this.configService.get<string>('PINATA_API_SECRET');
+
+    if (apiKey && apiSecret) {
+      this.pinata = new PinataClient(apiKey, apiSecret);
+    }
+  }
+
+  private ensureClient(): void {
+    if (!this.pinata) {
+      throw new InternalServerErrorException('IPFS client is not configured');
     }
   }
 
   async uploadFile(file: Buffer | Readable, fileName: string): Promise<string> {
+    this.ensureClient();
     try {
-      const result = await this.ipfs.add(file, {
-        pinataMetadata: {
-          name: fileName,
-        },
+      const stream = Buffer.isBuffer(file) ? Readable.from(file) : file;
+      const result = await this.pinata.pinFileToIPFS(stream, {
+        pinataMetadata: { name: fileName },
       });
-      return result.cid.toString();
+      return result.IpfsHash;
     } catch (error) {
-      throw new Error(`Failed to upload file to IPFS: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to upload file to IPFS: ${(error as Error).message}`);
     }
   }
 
-  async uploadJSON(data: any, fileName: string): Promise<string> {
+  async uploadJSON(data: unknown, fileName: string): Promise<string> {
+    this.ensureClient();
     try {
-      const result = await this.ipfs.add(JSON.stringify(data), {
-        pinataMetadata: {
-          name: fileName,
-        },
+      const result = await this.pinata.pinJSONToIPFS(data, {
+        pinataMetadata: { name: fileName },
       });
-      return result.cid.toString();
+      return result.IpfsHash;
     } catch (error) {
-      throw new Error(`Failed to upload JSON to IPFS: ${error.message}`);
+      throw new InternalServerErrorException(`Failed to upload JSON to IPFS: ${(error as Error).message}`);
     }
   }
 
-  async getFile(cid: string): Promise<any> {
-    try {
-      const chunks = [];
-      for await (const chunk of this.ipfs.cat(cid)) {
-        chunks.push(chunk);
-      }
-      return Buffer.concat(chunks);
-    } catch (error) {
-      throw new Error(`Failed to retrieve file from IPFS: ${error.message}`);
+  async getFile(cid: string): Promise<Buffer> {
+    const url = this.getGatewayUrl(cid);
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new InternalServerErrorException(`Failed to retrieve file from IPFS: ${res.statusText}`);
     }
+    return Buffer.from(await res.arrayBuffer());
   }
 
   getGatewayUrl(cid: string): string {
-    const gateway = this.configService.get<string>('PINATA_GATEWAY') || 'https://gateway.pinata.cloud/ipfs/';
+    const gateway =
+      this.configService.get<string>('PINATA_GATEWAY') ?? 'https://gateway.pinata.cloud/ipfs/';
     return `${gateway}${cid}`;
+  }
+
+  async testAuthentication(): Promise<boolean> {
+    this.ensureClient();
+    const result = await this.pinata.testAuthentication();
+    return result.authenticated;
   }
 }

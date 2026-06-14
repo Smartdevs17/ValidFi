@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Verification } from './verification.entity';
+import { LessThan, Repository } from 'typeorm';
+import { Verification, VerificationStatus } from './verification.entity';
 import { CreateVerificationDto } from './dto/create-verification.dto';
 import { UpdateVerificationDto } from './dto/update-verification.dto';
 
@@ -37,13 +37,13 @@ export class VerificationService {
 
   async approve(id: string): Promise<Verification> {
     const verification = await this.findOne(id);
-    verification.status = 'approved';
+    verification.status = VerificationStatus.APPROVED;
     return await this.verificationRepository.save(verification);
   }
 
   async reject(id: string, reason: string): Promise<Verification> {
     const verification = await this.findOne(id);
-    verification.status = 'rejected';
+    verification.status = VerificationStatus.REJECTED;
     verification.reason = reason;
     return await this.verificationRepository.save(verification);
   }
@@ -53,5 +53,22 @@ export class VerificationService {
       where: { identityId },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async expireStale(): Promise<number> {
+    const result = await this.verificationRepository.update(
+      {
+        status: VerificationStatus.PENDING,
+        expiresAt: LessThan(new Date()),
+      },
+      { status: VerificationStatus.EXPIRED },
+    );
+    return result.affected ?? 0;
+  }
+
+  async isExpired(id: string): Promise<boolean> {
+    const verification = await this.findOne(id);
+    if (!verification.expiresAt) return false;
+    return verification.expiresAt < new Date();
   }
 }

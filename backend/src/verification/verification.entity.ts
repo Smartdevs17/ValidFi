@@ -1,13 +1,29 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
+
+export enum VerificationStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  EXPIRED = 'expired',
+}
 
 @Entity('verifications')
 export class Verification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column()
   identityId: string;
 
+  @Index()
   @Column()
   walletAddress: string;
 
@@ -17,11 +33,14 @@ export class Verification {
   @Column()
   verificationCommitment: string;
 
-  @Column({ default: 'pending' })
-  status: string; // pending, approved, rejected
+  @Column({ type: 'enum', enum: VerificationStatus, default: VerificationStatus.PENDING })
+  status: VerificationStatus;
 
   @Column({ nullable: true })
   reason: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  expiresAt: Date | null;
 
   @Column({ type: 'json', nullable: true })
   metadata: Record<string, any>;

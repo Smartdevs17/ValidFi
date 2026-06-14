@@ -4,6 +4,14 @@ import { Repository } from 'typeorm';
 import { Identity } from './identity.entity';
 import { CreateIdentityDto } from './dto/create-identity.dto';
 import { UpdateIdentityDto } from './dto/update-identity.dto';
+import { PaginateIdentityDto } from './dto/paginate-identity.dto';
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  lastPage: number;
+}
 
 @Injectable()
 export class IdentityService {
@@ -17,14 +25,26 @@ export class IdentityService {
     return await this.identityRepository.save(identity);
   }
 
-  async findAll(walletAddress?: string): Promise<Identity[]> {
-    if (walletAddress) {
-      return await this.identityRepository.find({
-        where: { walletAddress },
-        order: { createdAt: 'DESC' },
-      });
-    }
-    return await this.identityRepository.find({ order: { createdAt: 'DESC' } });
+  async findAll(
+    walletAddress?: string,
+    pagination?: PaginateIdentityDto,
+  ): Promise<PaginatedResult<Identity>> {
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: Record<string, unknown> = {};
+    if (walletAddress) where.walletAddress = walletAddress;
+    if (pagination?.verifiedOnly) where.verificationStatus = true;
+
+    const [data, total] = await this.identityRepository.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return { data, total, page, lastPage: Math.ceil(total / limit) };
   }
 
   async findOne(id: string): Promise<Identity> {

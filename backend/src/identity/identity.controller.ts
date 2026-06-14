@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
 import { IdentityService } from './identity.service';
 import { CreateIdentityDto } from './dto/create-identity.dto';
 import { UpdateIdentityDto } from './dto/update-identity.dto';
+import { PaginateIdentityDto } from './dto/paginate-identity.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('identities')
@@ -18,8 +19,8 @@ export class IdentityController {
   }
 
   @Get()
-  findAll(@Request() req) {
-    return this.identityService.findAll(req.user.walletAddress);
+  findAll(@Request() req, @Query() pagination: PaginateIdentityDto) {
+    return this.identityService.findAll(req.user.walletAddress, pagination);
   }
 
   @Get(':id')

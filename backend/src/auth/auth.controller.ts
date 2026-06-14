@@ -1,4 +1,12 @@
-import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UnauthorizedException,
+  BadRequestException,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -7,6 +15,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
     const isValid = await this.authService.validateWallet(
       loginDto.walletAddress,
@@ -15,18 +24,32 @@ export class AuthController {
     );
 
     if (!isValid) {
-      return { error: 'Invalid signature' };
+      throw new UnauthorizedException('Wallet signature is invalid');
     }
 
     return this.authService.login(loginDto.walletAddress);
   }
 
   @Post('verify')
+  @HttpCode(HttpStatus.OK)
   async verify(@Body('token') token: string) {
-    try {
-      return this.authService.verifyToken(token);
-    } catch (error) {
-      return { error: 'Invalid token' };
+    if (!token) {
+      throw new BadRequestException('token is required');
     }
+
+    try {
+      return await this.authService.verifyToken(token);
+    } catch {
+      throw new UnauthorizedException('Token is invalid or expired');
+    }
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body('walletAddress') walletAddress: string) {
+    if (!walletAddress) {
+      throw new BadRequestException('walletAddress is required');
+    }
+    return this.authService.refreshToken(walletAddress);
   }
 }
