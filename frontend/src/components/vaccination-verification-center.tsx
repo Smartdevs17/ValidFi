@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertCircle, Shield } from 'lucide-react';
 
-interface VerificationCenterProps {
+interface VaccinationVerificationCenterProps {
   walletAddress: string;
 }
 
-export function VerificationCenter({ walletAddress }: VerificationCenterProps) {
+export function VaccinationVerificationCenter({ walletAddress }: VaccinationVerificationCenterProps) {
   const [verifications] = useState<any[]>([]);
 
   const getStatusIcon = (status: string) => {
@@ -25,7 +25,7 @@ export function VerificationCenter({ walletAddress }: VerificationCenterProps) {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-white mb-6">Verification Center</h2>
+      <h2 className="text-2xl font-bold text-white mb-6">Vaccination Verification Center</h2>
       
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-green-500/20 rounded-lg p-4 text-center">
@@ -44,9 +44,9 @@ export function VerificationCenter({ walletAddress }: VerificationCenterProps) {
 
       <div className="space-y-4">
         {verifications.length === 0 ? (
-          <div className="text-center py-8 text-blue-200">
-            <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No verification requests yet</p>
+          <div className="text-center py-8 text-green-200">
+            <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No vaccination verifications yet</p>
           </div>
         ) : (
           verifications.map((verification) => (
@@ -57,8 +57,8 @@ export function VerificationCenter({ walletAddress }: VerificationCenterProps) {
               <div className="flex items-center gap-4">
                 {getStatusIcon(verification.status)}
                 <div>
-                  <p className="text-white font-medium">{verification.documentType}</p>
-                  <p className="text-blue-200 text-sm">
+                  <p className="text-white font-medium">{verification.vaccineType}</p>
+                  <p className="text-green-200 text-sm">
                     Submitted: {new Date(verification.createdAt).toLocaleDateString()}
                   </p>
                 </div>
