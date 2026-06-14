@@ -1,5 +1,8 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec, Map, U256};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 
+use crate::errors::Error;
+
+#[contracttype]
 #[derive(Clone)]
 pub struct AccessPermission {
     pub grantor: Address,
@@ -23,9 +26,14 @@ impl AccessControl {
         duration_seconds: u64,
     ) -> u64 {
         grantor.require_auth();
-        
-        let permission_id = env.storage().instance().get(&("permission_counter")).unwrap_or(0u64) + 1;
-        
+
+        let permission_id = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&"permission_counter")
+            .unwrap_or(0u64)
+            + 1;
+
         let permission = AccessPermission {
             grantor: grantor.clone(),
             grantee: grantee.clone(),
@@ -34,77 +42,82 @@ impl AccessControl {
             is_active: true,
             granted_at: env.ledger().timestamp(),
         };
-        
-        env.storage().instance().set(&("permission_counter"), &permission_id);
-        env.storage().instance().set(&(permission_id, "permission"), &permission);
-        env.storage().instance().set(&(grantee, resource_id), &permission_id);
-        
+
+        env.storage()
+            .instance()
+            .set(&"permission_counter", &permission_id);
+        env.storage()
+            .instance()
+            .set(&(permission_id, "permission"), &permission);
+        env.storage()
+            .instance()
+            .set(&(grantee, resource_id), &permission_id);
+
         permission_id
     }
-    
-    pub fn revoke_access(env: &Env, permission_id: u64) {
-        let mut permission: AccessPermission = env.storage().instance()
+
+    pub fn revoke_access(env: &Env, permission_id: u64) -> Result<(), Error> {
+        let mut permission: AccessPermission = env
+            .storage()
+            .instance()
             .get(&(permission_id, "permission"))
-            .unwrap_or_else(|| panic!("Permission not found"));
-        
+            .ok_or(Error::PermissionNotFound)?;
+
         permission.grantor.require_auth();
-        
         permission.is_active = false;
-        
-        env.storage().instance().set(&(permission_id, "permission"), &permission);
+
+        env.storage()
+            .instance()
+            .set(&(permission_id, "permission"), &permission);
+        Ok(())
     }
-    
+
     pub fn check_access(env: &Env, grantee: Address, resource_id: u64) -> bool {
-        let permission_id: u64 = env.storage().instance()
+        let permission_id: u64 = match env
+            .storage()
+            .instance()
             .get(&(grantee, resource_id))
-            .unwrap_or_else(|| return false);
-        
-        let permission: AccessPermission = env.storage().instance()
+        {
+            Some(id) => id,
+            None => return false,
+        };
+
+        let permission: AccessPermission = match env
+            .storage()
+            .instance()
             .get(&(permission_id, "permission"))
-            .unwrap_or_else(|| return false);
-        
-        if !permission.is_active {
-            return false;
-        }
-        
-        if env.ledger().timestamp() > permission.access_expiry {
-            return false;
-        }
-        
-        true
+        {
+            Some(p) => p,
+            None => return false,
+        };
+
+        permission.is_active && env.ledger().timestamp() <= permission.access_expiry
     }
-    
-    pub fn get_permission(env: &Env, permission_id: u64) -> AccessPermission {
-        env.storage().instance()
+
+    pub fn get_permission(env: &Env, permission_id: u64) -> Result<AccessPermission, Error> {
+        env.storage()
+            .instance()
             .get(&(permission_id, "permission"))
-            .unwrap_or_else(|| panic!("Permission not found"))
+            .ok_or(Error::PermissionNotFound)
     }
-    
-    pub fn get_permissions_by_grantee(env: &Env, grantee: Address) -> Vec<u64> {
-        let mut permissions = Vec::new(env);
-        
-        // In a real implementation, you'd iterate through storage
-        // For now, return empty vector as placeholder
-        permissions
-    }
-    
-    pub fn get_permissions_by_grantor(env: &Env, grantor: Address) -> Vec<u64> {
-        let mut permissions = Vec::new(env);
-        
-        // In a real implementation, you'd iterate through storage
-        // For now, return empty vector as placeholder
-        permissions
-    }
-    
-    pub fn extend_access(env: &Env, permission_id: u64, additional_seconds: u64) {
-        let mut permission: AccessPermission = env.storage().instance()
+
+    pub fn extend_access(
+        env: &Env,
+        permission_id: u64,
+        additional_seconds: u64,
+    ) -> Result<(), Error> {
+        let mut permission: AccessPermission = env
+            .storage()
+            .instance()
             .get(&(permission_id, "permission"))
-            .unwrap_or_else(|| panic!("Permission not found"));
-        
+            .ok_or(Error::PermissionNotFound)?;
+
         permission.grantor.require_auth();
-        
         permission.access_expiry += additional_seconds;
-        
-        env.storage().instance().set(&(permission_id, "permission"), &permission);
+
+        env.storage()
+            .instance()
+            .set(&(permission_id, "permission"), &permission);
+        Ok(())
     }
 }

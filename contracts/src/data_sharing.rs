@@ -1,5 +1,8 @@
-use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String, Vec, Map};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, BytesN, Env};
 
+use crate::errors::Error;
+
+#[contracttype]
 #[derive(Clone)]
 pub struct SharedData {
     pub owner: Address,
@@ -25,96 +28,98 @@ impl DataSharing {
         duration_seconds: u64,
     ) -> u64 {
         owner.require_auth();
-        
-        let share_id = env.storage().instance().get(&("share_counter")).unwrap_or(0u64) + 1;
-        
+
+        let share_id = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&"share_counter")
+            .unwrap_or(0u64)
+            + 1;
+
         let shared_data = SharedData {
             owner: owner.clone(),
             recipient: recipient.clone(),
             document_hash: document_hash.clone(),
-            encrypted_key: encrypted_key.clone(),
+            encrypted_key,
             access_expiry: env.ledger().timestamp() + duration_seconds,
             is_active: true,
             shared_at: env.ledger().timestamp(),
         };
-        
-        env.storage().instance().set(&("share_counter"), &share_id);
-        env.storage().instance().set(&(share_id, "shared_data"), &shared_data);
-        env.storage().instance().set(&(owner, recipient, document_hash), &share_id);
-        
+
+        env.storage().instance().set(&"share_counter", &share_id);
+        env.storage()
+            .instance()
+            .set(&(share_id, "shared_data"), &shared_data);
+        env.storage()
+            .instance()
+            .set(&(owner, recipient, document_hash), &share_id);
+
         share_id
     }
-    
-    pub fn revoke_shared_document(env: &Env, share_id: u64) {
-        let mut shared_data: SharedData = env.storage().instance()
+
+    pub fn revoke_shared_document(env: &Env, share_id: u64) -> Result<(), Error> {
+        let mut shared_data: SharedData = env
+            .storage()
+            .instance()
             .get(&(share_id, "shared_data"))
-            .unwrap_or_else(|| panic!("Shared document not found"));
-        
+            .ok_or(Error::SharedDocumentNotFound)?;
+
         shared_data.owner.require_auth();
-        
         shared_data.is_active = false;
-        
-        env.storage().instance().set(&(share_id, "shared_data"), &shared_data);
+
+        env.storage()
+            .instance()
+            .set(&(share_id, "shared_data"), &shared_data);
+        Ok(())
     }
-    
-    pub fn get_shared_document(env: &Env, share_id: u64) -> SharedData {
-        env.storage().instance()
+
+    pub fn get_shared_document(env: &Env, share_id: u64) -> Result<SharedData, Error> {
+        env.storage()
+            .instance()
             .get(&(share_id, "shared_data"))
-            .unwrap_or_else(|| panic!("Shared document not found"))
+            .ok_or(Error::SharedDocumentNotFound)
     }
-    
+
     pub fn get_shared_document_by_parties(
         env: &Env,
         owner: Address,
         recipient: Address,
         document_hash: BytesN<32>,
-    ) -> u64 {
-        env.storage().instance()
+    ) -> Result<u64, Error> {
+        env.storage()
+            .instance()
             .get(&(owner, recipient, document_hash))
-            .unwrap_or_else(|| panic!("Shared document not found"))
+            .ok_or(Error::SharedDocumentNotFound)
     }
-    
-    pub fn is_share_active(env: &Env, share_id: u64) -> bool {
-        let shared_data: SharedData = env.storage().instance()
+
+    pub fn is_share_active(env: &Env, share_id: u64) -> Result<bool, Error> {
+        let shared_data: SharedData = env
+            .storage()
+            .instance()
             .get(&(share_id, "shared_data"))
-            .unwrap_or_else(|| panic!("Shared document not found"));
-        
-        if !shared_data.is_active {
-            return false;
-        }
-        
-        if env.ledger().timestamp() > shared_data.access_expiry {
-            return false;
-        }
-        
-        true
+            .ok_or(Error::SharedDocumentNotFound)?;
+
+        Ok(shared_data.is_active
+            && env.ledger().timestamp() <= shared_data.access_expiry)
     }
-    
-    pub fn extend_share(env: &Env, share_id: u64, additional_seconds: u64) {
-        let mut shared_data: SharedData = env.storage().instance()
+
+    pub fn extend_share(
+        env: &Env,
+        share_id: u64,
+        additional_seconds: u64,
+    ) -> Result<(), Error> {
+        let mut shared_data: SharedData = env
+            .storage()
+            .instance()
             .get(&(share_id, "shared_data"))
-            .unwrap_or_else(|| panic!("Shared document not found"));
-        
+            .ok_or(Error::SharedDocumentNotFound)?;
+
         shared_data.owner.require_auth();
-        
         shared_data.access_expiry += additional_seconds;
-        
-        env.storage().instance().set(&(share_id, "shared_data"), &shared_data);
-    }
-    
-    pub fn get_shares_by_owner(env: &Env, owner: Address) -> Vec<u64> {
-        let mut shares = Vec::new(env);
-        
-        // In a real implementation, you'd iterate through storage
-        // For now, return empty vector as placeholder
-        shares
-    }
-    
-    pub fn get_shares_by_recipient(env: &Env, recipient: Address) -> Vec<u64> {
-        let mut shares = Vec::new(env);
-        
-        // In a real implementation, you'd iterate through storage
-        // For now, return empty vector as placeholder
-        shares
+
+        env.storage()
+            .instance()
+            .set(&(share_id, "shared_data"), &shared_data);
+        Ok(())
     }
 }
