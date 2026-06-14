@@ -1,24 +1,33 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as sorobanSdk from 'soroban-sdk';
+import {
+  SorobanRpc,
+  Contract,
+  TransactionBuilder,
+  Address,
+  Keypair,
+  Networks,
+} from '@stellar/stellar-sdk';
 
 @Injectable()
 export class SorobanService {
-  private server: any;
+  private server: SorobanRpc.Server;
+  private networkPassphrase: string;
   private contracts: {
-    identityRegistry?: any;
-    verification?: any;
-    accessControl?: any;
-    dataSharing?: any;
+    identityRegistry?: Contract;
+    verification?: Contract;
+    accessControl?: Contract;
+    dataSharing?: Contract;
   } = {};
 
   constructor(private readonly configService: ConfigService) {
     const networkUrl = this.configService.get<string>('SOROBAN_NETWORK_URL');
-    const networkPassphrase = this.configService.get<string>('SOROBAN_NETWORK_PASSPHRASE');
+    this.networkPassphrase =
+      this.configService.get<string>('SOROBAN_NETWORK_PASSPHRASE') ??
+      Networks.TESTNET;
 
-    if (networkUrl && networkPassphrase) {
-      this.server = new sorobanSdk.Server(networkUrl);
-      sorobanSdk.Networks.use(networkPassphrase);
+    if (networkUrl) {
+      this.server = new SorobanRpc.Server(networkUrl, { allowHttp: false });
     }
 
     this.initializeContracts();
@@ -31,16 +40,16 @@ export class SorobanService {
     const dataSharingId = this.configService.get<string>('DATA_SHARING_CONTRACT_ID');
 
     if (identityRegistryId) {
-      this.contracts.identityRegistry = new sorobanSdk.Contract(identityRegistryId);
+      this.contracts.identityRegistry = new Contract(identityRegistryId);
     }
     if (verificationId) {
-      this.contracts.verification = new sorobanSdk.Contract(verificationId);
+      this.contracts.verification = new Contract(verificationId);
     }
     if (accessControlId) {
-      this.contracts.accessControl = new sorobanSdk.Contract(accessControlId);
+      this.contracts.accessControl = new Contract(accessControlId);
     }
     if (dataSharingId) {
-      this.contracts.dataSharing = new sorobanSdk.Contract(dataSharingId);
+      this.contracts.dataSharing = new Contract(dataSharingId);
     }
   }
 
@@ -55,14 +64,14 @@ export class SorobanService {
       }
 
       const account = await this.server.getAccount(walletAddress);
-      const transaction = new sorobanSdk.TransactionBuilder(account, {
+      const transaction = new TransactionBuilder(account, {
         fee: '100',
-        networkPassphrase: sorobanSdk.Networks.current(),
+        networkPassphrase: this.networkPassphrase,
       })
         .addOperation(
           this.contracts.identityRegistry.call('register_identity', {
-            owner: new sorobanSdk.Address(walletAddress),
-            document_hash: sorobanSdk.Buffer.from(documentHash, 'hex'),
+            owner: new Address(walletAddress),
+            document_hash: Buffer.from(documentHash, 'hex'),
             ipfs_cid: ipfsCid,
           }),
         )
@@ -87,16 +96,16 @@ export class SorobanService {
       }
 
       const account = await this.server.getAccount(verifierAddress);
-      const transaction = new sorobanSdk.TransactionBuilder(account, {
+      const transaction = new TransactionBuilder(account, {
         fee: '100',
-        networkPassphrase: sorobanSdk.Networks.current(),
+        networkPassphrase: this.networkPassphrase,
       })
         .addOperation(
           this.contracts.verification.call('submit_proof', {
             identity_id: identityId,
-            verifier: new sorobanSdk.Address(verifierAddress),
-            proof_hash: sorobanSdk.Buffer.from(proofHash, 'hex'),
-            verification_commitment: sorobanSdk.Buffer.from(verificationCommitment, 'hex'),
+            verifier: new Address(verifierAddress),
+            proof_hash: Buffer.from(proofHash, 'hex'),
+            verification_commitment: Buffer.from(verificationCommitment, 'hex'),
           }),
         )
         .setTimeout(30)
@@ -120,14 +129,14 @@ export class SorobanService {
       }
 
       const account = await this.server.getAccount(grantorAddress);
-      const transaction = new sorobanSdk.TransactionBuilder(account, {
+      const transaction = new TransactionBuilder(account, {
         fee: '100',
-        networkPassphrase: sorobanSdk.Networks.current(),
+        networkPassphrase: this.networkPassphrase,
       })
         .addOperation(
           this.contracts.accessControl.call('grant_access', {
-            grantor: new sorobanSdk.Address(grantorAddress),
-            grantee: new sorobanSdk.Address(granteeAddress),
+            grantor: new Address(grantorAddress),
+            grantee: new Address(granteeAddress),
             resource_id: resourceId,
             duration_seconds: durationSeconds,
           }),
@@ -154,16 +163,16 @@ export class SorobanService {
       }
 
       const account = await this.server.getAccount(ownerAddress);
-      const transaction = new sorobanSdk.TransactionBuilder(account, {
+      const transaction = new TransactionBuilder(account, {
         fee: '100',
-        networkPassphrase: sorobanSdk.Networks.current(),
+        networkPassphrase: this.networkPassphrase,
       })
         .addOperation(
           this.contracts.dataSharing.call('share_document', {
-            owner: new sorobanSdk.Address(ownerAddress),
-            recipient: new sorobanSdk.Address(recipientAddress),
-            document_hash: sorobanSdk.Buffer.from(documentHash, 'hex'),
-            encrypted_key: sorobanSdk.Buffer.from(encryptedKey, 'hex'),
+            owner: new Address(ownerAddress),
+            recipient: new Address(recipientAddress),
+            document_hash: Buffer.from(documentHash, 'hex'),
+            encrypted_key: Buffer.from(encryptedKey, 'hex'),
             duration_seconds: durationSeconds,
           }),
         )
@@ -178,7 +187,7 @@ export class SorobanService {
 
   async signAndSubmitTransaction(transaction: any, secretKey: string): Promise<any> {
     try {
-      const keypair = sorobanSdk.Keypair.fromSecret(secretKey);
+      const keypair = Keypair.fromSecret(secretKey);
       transaction.sign(keypair);
       const result = await this.server.sendTransaction(transaction);
       return result;

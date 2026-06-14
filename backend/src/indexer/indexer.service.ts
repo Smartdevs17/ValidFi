@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { Server, SorobanRpc } from 'soroban-sdk';
+import { SorobanRpc } from '@stellar/stellar-sdk';
 import {
   IndexedIdentity,
   IndexedVerification,
@@ -14,7 +14,7 @@ import {
 @Injectable()
 export class IndexerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IndexerService.name);
-  private rpcServer: Server;
+  private rpcServer: SorobanRpc.Server;
   private isIndexing = false;
   private lastLedgerSequence: number = 0;
 
@@ -32,8 +32,8 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const sorobanNetworkUrl = this.configService.get<string>('SOROBAN_NETWORK_URL');
-    this.rpcServer = new Server(sorobanNetworkUrl, {
-      allowHttp: true,
+    this.rpcServer = new SorobanRpc.Server(sorobanNetworkUrl, {
+      allowHttp: sorobanNetworkUrl?.startsWith('http://') ?? false,
     });
 
     // Get the last indexed ledger from database
