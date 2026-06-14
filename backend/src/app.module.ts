@@ -15,6 +15,7 @@ import { IpfsModule } from './ipfs/ipfs.module';
 import { AiModule } from './ai/ai.module';
 import { SorobanModule } from './soroban/soroban.module';
 import { IndexerModule } from './indexer/indexer.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { IndexerModule } from './indexer/indexer.module';
     AiModule,
     SorobanModule,
     IndexerModule,
+    HealthModule,
   ],
   providers: [
     {
