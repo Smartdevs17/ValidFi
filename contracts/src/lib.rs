@@ -1,3 +1,5 @@
+#![no_std]
+
 pub mod access_control;
 pub mod data_sharing;
 pub mod errors;
