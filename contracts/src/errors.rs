@@ -8,4 +8,6 @@ pub enum Error {
     VerificationNotFound = 2,
     PermissionNotFound = 3,
     SharedDocumentNotFound = 4,
+    Unauthorized = 5,
+    AlreadyInitialized = 6,
 }
