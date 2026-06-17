@@ -99,15 +99,10 @@ impl DataSharing {
             .get(&(share_id, "shared_data"))
             .ok_or(Error::SharedDocumentNotFound)?;
 
-        Ok(shared_data.is_active
-            && env.ledger().timestamp() <= shared_data.access_expiry)
+        Ok(shared_data.is_active && env.ledger().timestamp() <= shared_data.access_expiry)
     }
 
-    pub fn extend_share(
-        env: &Env,
-        share_id: u64,
-        additional_seconds: u64,
-    ) -> Result<(), Error> {
+    pub fn extend_share(env: &Env, share_id: u64, additional_seconds: u64) -> Result<(), Error> {
         let mut shared_data: SharedData = env
             .storage()
             .instance()

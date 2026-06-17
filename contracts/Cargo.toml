@@ -3,6 +3,9 @@ name = "securedata-contracts"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+testutils = ["soroban-sdk/testutils"]
+
 [dependencies]
 soroban-sdk = "21.0.0"
 

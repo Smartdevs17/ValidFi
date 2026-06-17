@@ -95,30 +95,21 @@ impl Verification {
         Ok(())
     }
 
-    pub fn get_verification(
-        env: &Env,
-        verification_id: u64,
-    ) -> Result<VerificationRecord, Error> {
+    pub fn get_verification(env: &Env, verification_id: u64) -> Result<VerificationRecord, Error> {
         env.storage()
             .instance()
             .get(&(verification_id, "record"))
             .ok_or(Error::VerificationNotFound)
     }
 
-    pub fn get_verification_by_identity(
-        env: &Env,
-        identity_id: u64,
-    ) -> Result<u64, Error> {
+    pub fn get_verification_by_identity(env: &Env, identity_id: u64) -> Result<u64, Error> {
         env.storage()
             .instance()
             .get(&(identity_id, "verification"))
             .ok_or(Error::VerificationNotFound)
     }
 
-    pub fn get_verification_status(
-        env: &Env,
-        verification_id: u64,
-    ) -> Result<String, Error> {
+    pub fn get_verification_status(env: &Env, verification_id: u64) -> Result<String, Error> {
         let record: VerificationRecord = env
             .storage()
             .instance()

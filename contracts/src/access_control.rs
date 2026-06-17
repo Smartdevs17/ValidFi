@@ -73,23 +73,16 @@ impl AccessControl {
     }
 
     pub fn check_access(env: &Env, grantee: Address, resource_id: u64) -> bool {
-        let permission_id: u64 = match env
-            .storage()
-            .instance()
-            .get(&(grantee, resource_id))
-        {
+        let permission_id: u64 = match env.storage().instance().get(&(grantee, resource_id)) {
             Some(id) => id,
             None => return false,
         };
 
-        let permission: AccessPermission = match env
-            .storage()
-            .instance()
-            .get(&(permission_id, "permission"))
-        {
-            Some(p) => p,
-            None => return false,
-        };
+        let permission: AccessPermission =
+            match env.storage().instance().get(&(permission_id, "permission")) {
+                Some(p) => p,
+                None => return false,
+            };
 
         permission.is_active && env.ledger().timestamp() <= permission.access_expiry
     }
