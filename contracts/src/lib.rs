@@ -10,6 +10,9 @@ pub mod verification;
 #[cfg(test)]
 mod upgrade_tests;
 
+#[cfg(test)]
+mod integration_tests;
+
 pub use access_control::AccessControl;
 pub use data_sharing::DataSharing;
 pub use errors::Error;
